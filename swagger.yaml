@@ -30,7 +30,7 @@ paths:
 
       tags:
         - Token
-      operationId: create-token
+      operationId: get-token
       security:
         - basicAuth: []
       parameters:
