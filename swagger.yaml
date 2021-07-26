@@ -1,0 +1,1792 @@
+openapi: 3.0.0
+x-stoplight:
+  docs:
+    showModels: false
+info:
+  description: ''
+  title: Pay Station API
+  version: '2.0'
+servers:
+  - url: 'https://api.xsolla.com/merchant/v2/'
+tags:
+  - name: Token
+    description: |
+      In order to enable secure payments, Xsolla API handles payment parameters within a token instead of receiving them directly through GET requests to the payment page. You have to obtain a new token before rendering the payment page. A token is valid for 24 hours.
+  - name: Tokenization
+    description: |
+      To learn more about setting up tokenization for your app, see the [Pay Station documentation](https://developers.xsolla.com/doc/pay-station/features/tokenization/).
+  - name: Reports
+  - name: Refund
+paths:
+  '/merchants/{merchant_id}/token':
+    post:
+      summary: Create token
+      description: |
+        You can create a token with arbitrary user parameters. You send these parameters when obtaining the token, and we send them back to you after a successful payment. A token can only contain parameters either described in this document or predefined by the partner.
+
+        If any parameter is sent in the wrong format or has the wrong type, no token will be issued. You will receive a **422** HTTP code with the error description in the JSON body. In `extended_message` we will provide you an information what exactly parameters have been send incorrectly.
+
+        <div class='note'><b>Note</b><br><br>This API method can't be used under high load. When the number of requests is high, rate limits may apply. Contact your Account Manager to find out the rate limits for this API method.</div>
+
+      tags:
+        - Token
+      operationId: create-token
+      security:
+        - basicAuth: []
+      parameters:
+        - $ref: '#/components/parameters/merchant-id-path-param'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                user:
+                  $ref: '#/components/schemas/User'
+                settings:
+                  $ref: '#/components/schemas/Settings'
+                purchase:
+                  $ref: '#/components/schemas/Purchase'
+                custom_parameters:
+                  $ref: '#/components/schemas/CustomParameters'
+            example:
+              purchase:
+                virtual_currency:
+                  quantity: 100
+                virtual_items:
+                  items:
+                    - amount: 1
+                      sku: SKU01
+              settings:
+                currency: USD
+                language: en
+                project_id: 16184
+                ui:
+                  components:
+                    virtual_currency:
+                      custom_amount: true
+                  desktop:
+                    virtual_item_list:
+                      button_with_price: true
+                      layout: list
+                  size: medium
+              user:
+                country:
+                  allow_modify: true
+                  value: US
+                age: 19
+                email:
+                  value: john.smith@mail.com
+                id:
+                  value: user_2
+                name:
+                  value: John Smith
+      responses:
+        '201':
+          description: Created.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token:
+                    type: string
+              example:
+                token: eop57k1boA7nnYPtewZ6KEXJyJADEwRT
+        '422':
+          description: Unprocessable Entity.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  http_status_code:
+                    type: integer
+                  message:
+                    type: string
+                  extended_message:
+                    type: object
+                    properties:
+                      global_errors:
+                        type: array
+                        items:
+                          type: string
+                      property_errors:
+                        type: object
+                        description: Object contains parameter names with error descriptions.
+                  request_id:
+                    type: string
+              example:
+                http_status_code: 422
+                message: 'JSON is not valid against json schema, please check documentation https://developers.xsolla.com/api/v2/getting-started/#api_token_ui'
+                extended_message:
+                  global_errors: []
+                  property_errors:
+                    purchase.checkout.amount:
+                      - 'String value found, but a number is required'
+                request_id: cd72633
+  '/projects/{project_id}/users/{user_id}/payment_accounts':
+    get:
+      summary: Get saved accounts
+      description: Lists saved payment accounts of a given user.
+      tags:
+        - Tokenization
+      operationId: get-saved-accounts
+      security:
+        - basicAuth: []
+      parameters:
+        - $ref: '#/components/parameters/project-id-path-param'
+        - $ref: '#/components/parameters/user-id-path-param'
+      responses:
+        '200':
+          description: OK.
+          content:
+            application/json:
+              example:
+                - id: 4612345
+                  name: PP_saved_account
+                  payment_system:
+                    id: 24
+                    name: PayPal
+                  type: paypal
+  '/projects/{project_id}/users/{user_id}/payments/{type}/{account_id}':
+    post:
+      summary: Charge with saved account
+      description: |
+        Charges a user via a saved payment account.
+
+        <div class='note'><b>Note</b><br><br>This API method can't be used under high load. When the number of requests is high, rate limits may apply. Contact your Account Manager to find out the rate limits for this API method.</div>
+      tags:
+        - Tokenization
+      operationId: charge-with-saved-account
+      security:
+        - basicAuth: []
+      parameters:
+        - $ref: '#/components/parameters/project-id-path-param'
+        - $ref: '#/components/parameters/user-id-path-param'
+        - $ref: '#/components/parameters/type-path-param'
+        - $ref: '#/components/parameters/account-id-path-param'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                user:
+                  $ref: '#/components/schemas/User_body'
+                settings:
+                  $ref: '#/components/schemas/Settings_body'
+                purchase:
+                  $ref: '#/components/schemas/Purchase_body'
+                custom_parameters:
+                  $ref: '#/components/schemas/CustomParameters'
+            example:
+              card:
+                cvn: '123'
+              purchase:
+                description:
+                  value: currency purchase
+                virtual_currency:
+                  quantity: 100
+              settings:
+                currency: USD
+                external_id: ext123
+                save: true
+              user:
+                id: user123
+                ip: 111.11.11.11
+                name: John Smith
+                legal:
+                  name: My Awesome Company
+                  address: 17 Crown Street London SW2 0JW United Kingdom
+                  vat_id: GB111111111
+                  country: GB
+      responses:
+        '201':
+          description: Created.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  transaction_id:
+                    type: integer
+              example:
+                transaction_id: 123458390
+        '422':
+          description: Unprocessable Entity.
+  '/projects/{project_id}/users/{user_id}/payment_accounts/{type}/{account_id}':
+    delete:
+      summary: Delete saved account
+      description: Deletes a saved payment account.
+      tags:
+        - Tokenization
+      operationId: delete-saved-account
+      security:
+        - basicAuth: []
+      parameters:
+        - $ref: '#/components/parameters/project-id-path-param'
+        - $ref: '#/components/parameters/user-id-path-param'
+        - $ref: '#/components/parameters/type-path-param'
+        - $ref: '#/components/parameters/account-id-path-param'
+      responses:
+        '204':
+          description: No Content.
+  '/merchants/{merchant_id}/reports/transactions/search.{format}':
+    get:
+      summary: Find transactions
+      description: Gets a list of transactions based on specific search parameters. You can get the list in JSON, CSV, or XLS format.
+      tags:
+        - Reports
+      operationId: find-transactions
+      security:
+        - basicAuth: []
+      parameters:
+        - $ref: '#/components/parameters/merchant-id-path-param'
+        - $ref: '#/components/parameters/format'
+        - $ref: '#/components/parameters/datetime-from'
+        - $ref: '#/components/parameters/datetime-to'
+        - $ref: '#/components/parameters/project-id-query-param'
+        - $ref: '#/components/parameters/show-dry-run'
+        - $ref: '#/components/parameters/transaction-id'
+        - $ref: '#/components/parameters/phone'
+        - $ref: '#/components/parameters/user-id-query-param'
+        - $ref: '#/components/parameters/user-name'
+        - $ref: '#/components/parameters/user-custom'
+        - $ref: '#/components/parameters/email'
+        - $ref: '#/components/parameters/external-id'
+        - $ref: '#/components/parameters/offset'
+        - $ref: '#/components/parameters/limit'
+        - $ref: '#/components/parameters/transaction-type'
+        - $ref: '#/components/parameters/status'
+      responses:
+        '200':
+          description: OK.
+          content:
+            application/json:
+              example:
+                - payment_details:
+                    payment:
+                      amount: 86.68
+                      amount_from_ps: 86.68
+                      currency: RUB
+                    sales_tax:
+                      amount: 0
+                      percent: 0
+                  purchase:
+                    pin_codes:
+                      amount: null
+                      content: null
+                      currency: null
+                    simple_checkout:
+                      amount: 0
+                      currency: RUB
+                    subscription:
+                      name: null
+                    virtual_currency:
+                      amount: 0
+                      name: Maple
+                    virtual_items: Duck
+                  transaction:
+                    dry_run: 2
+                    external_id: null
+                    id: 141819657
+                    is_refund_allowed: 1
+                    payment_method:
+                      id: 98
+                      name: PayPal
+                    project:
+                      id: 89753
+                      name: Farm II Project
+                    refund_reason: Test payment
+                    status: canceled
+                    transfer_date: '2019-02-08T13:14:08+03:00'
+                  user:
+                    country: RU
+                    custom: null
+                    email: j.johns@transaction.com
+                    id: j.johns
+                    name: j.johns
+                    phone: null
+  '/merchants/{merchant_id}/reports/transactions/{transaction_id}/details':
+    get:
+      summary: Get transaction
+      description: Gets full transaction info by ID.
+      tags:
+        - Reports
+      operationId: get-transaction
+      security:
+        - basicAuth: []
+      parameters:
+        - $ref: '#/components/parameters/merchant-id-path-param'
+        - $ref: '#/components/parameters/transaction-id-path-param'
+      responses:
+        '200':
+          description: OK.
+          content:
+            application/json:
+              example:
+                customer_details:
+                  billing_address: ''
+                  bin: ''
+                  browser_language: ''
+                  country: US
+                  ip: 209.11.22.33
+                  paystation_country: ''
+                  phone: null
+                  timezone: ''
+                  user_id: user1
+                  user_name: John Smith
+                finance_details:
+                  payment:
+                    amount: '0.04'
+                    currency: USD
+                  payment_method_fee:
+                    amount: '0.01'
+                    currency: USD
+                  payment_method_sum:
+                    amount: '0.04'
+                    currency: USD
+                  payout:
+                    amount: '1.25'
+                    currency: RUB
+                  payout_currency_rate: '62.4080582524'
+                  repatriation_commission:
+                    amount: '0'
+                    currency: USD
+                  sales_tax:
+                    amount: '0'
+                    currency: USD
+                  direct_wht:
+                    amount: '0'
+                    currency: USD
+                  vat:
+                    amount: '0.01'
+                    currency: USD
+                  xsolla_balance_sum:
+                    amount: '0'
+                    currency: USD
+                  xsolla_fee:
+                    amount: '0'
+                    currency: USD
+                payment_details:
+                  card_holdername: null
+                  card_issuer: AWESOME BANK
+                  card_month: '01'
+                  card_number: '6759649826438453'
+                  card_scheme: MASTERCARD
+                  card_year: '2020'
+                  customer_firstname: ''
+                  customer_lastname: ''
+                  enrollment: false
+                  ps_account: 8c12345ef8ce398b98b655b68
+                  zip_code: ''
+                subscription_details:
+                  is_payment_from_subscription: false
+                  is_subscription_created: true
+                transaction_details:
+                  amount: '0.04'
+                  cancellation_date: null
+                  country: US
+                  currency: USD
+                  custom_parameters: null
+                  foreign_invoice: null
+                  gift_recipient_email: null
+                  gift_recipient_id: null
+                  payment_date: '2019-03-21 16:15:37'
+                  payment_method: '1380'
+                  payment_method_name: Credit/Debit Cards
+                  project: '21092'
+                  project_name: Farm Fresh
+                  purchase:
+                    checkout:
+                      amount: '0'
+                      currency: USD
+                    pin_codes:
+                      amount: '0'
+                      content: null
+                      currency: null
+                    total:
+                      amount: '0.03'
+                      currency: USD
+                    virtual_currency:
+                      amount: '0.03'
+                      currency: USD
+                      name: Gold coins
+                      quantity: '2'
+                    virtual_items: null
+                  refund_comment: null
+                  refund_reason: null
+                  status: done
+                  user_id: user1
+  '/merchants/{merchant_id}/reports/transactions/registry.{format}':
+    get:
+      summary: Get transactions
+      description: |
+        Gets all transactions for a specified period/payout/report. You can get the list in JSON, CSV, or XLS format.
+
+        <div class='note'><b>Note</b><br><br>This API method can't be used under high load. When the number of requests is high, rate limits may apply. Contact your Account Manager to find out the rate limits for this API method.</div>
+      tags:
+        - Reports
+      operationId: get-transactions
+      security:
+        - basicAuth: []
+      parameters:
+        - $ref: '#/components/parameters/merchant-id-path-param'
+        - $ref: '#/components/parameters/format'
+        - $ref: '#/components/parameters/datetime-from-req'
+        - $ref: '#/components/parameters/datetime-to-req'
+        - $ref: '#/components/parameters/in-transfer-currency'
+        - $ref: '#/components/parameters/show-total'
+        - $ref: '#/components/parameters/merchant-of-records'
+        - $ref: '#/components/parameters/project-id-query-param'
+        - $ref: '#/components/parameters/show-dry-run'
+        - $ref: '#/components/parameters/transfer-id'
+        - $ref: '#/components/parameters/report-id'
+        - $ref: '#/components/parameters/offset'
+        - $ref: '#/components/parameters/limit'
+        - $ref: '#/components/parameters/transaction-status'
+      responses:
+        '200':
+          description: OK.
+          content:
+            application/json:
+              example:
+                - payment_details:
+                    chargebackPenalty:
+                      amount: 0
+                    commission_agent:
+                      amount: 0
+                      percent: 0
+                    commission_agent_fixed: 0
+                    commission_ps:
+                      amount: 0
+                      fixed_amount: 0
+                      percent: 0
+                    commission_ps_from_vat:
+                      amount: 0
+                    commission_user:
+                      amount: 0.01
+                      percent: 33.33
+                    commission_xsolla:
+                      amount: 0
+                      fixed_amount: 0
+                      percent: 5
+                    cpa_network_commission:
+                      amount: 0
+                      percent: 0
+                    payment:
+                      amount: 0.03
+                      amount_from_ps: 0
+                      currency: USD
+                    payout:
+                      amount: 0.02
+                      amount_from_ps: 0
+                      currency: RUB
+                      fx_rate: 64.1386407767
+                      percent: 100
+                    direct_wht:
+                      amount: 0
+                      percent: 0
+                    refundPenalty:
+                      amount: 0
+                    repatriation_costs:
+                      amount: 0
+                      percent: 0
+                    sales_tax:
+                      amount: 0
+                      percent: 0
+                    vat:
+                      amount: 0
+                      percent: 0
+                      user_amount: 0
+                      user_percent: 0
+                  purchase:
+                    friend:
+                      email: null
+                      user_id: null
+                    items_amount: 1
+                    pin_codes:
+                      amount: null
+                      content: null
+                      currency: null
+                    purchase_amount: 0.02
+                    simple_checkout:
+                      amount: null
+                      currency: null
+                    subscription:
+                      name: null
+                      plan_id: null
+                      subscription_id: null
+                    virtual_currency:
+                      amount: 0.02
+                      currency: USD
+                    virtual_currency_amount: 1
+                    virtual_items:
+                      amount: null
+                      content: null
+                      currency: null
+                  transaction:
+                    custom_parameters: null
+                    direct_account: 0
+                    dry_run: 0
+                    external_id: null
+                    id: 418756634
+                    payment_method:
+                      class: Digital Payment Methods
+                      id: 2760
+                      name: Your Balance
+                    project:
+                      id: 21092
+                      name: Smith
+                    refund_reason: null
+                    refund_reason_comment: null
+                    status: done
+                    transfer_date: '2019-02-11T13:32:00+03:00'
+                  user:
+                    country: US
+                    custom: null
+                    email: t.lucky@transaction.com
+                    id: a.smith
+                    marketplace: Pay Station
+                    name: Tom
+                    phone: null
+                    ip: 209.11.22.33
+                  user_balance:
+                    payment_currency:
+                      deduction_amount: 0
+                      payout_amount_from_balance: 0.02
+                      purchase_amount_from_balance: 0.02
+  '/merchants/{merchant_id}/reports/transactions/summary/transfer':
+    get:
+      summary: Get payouts
+      description: |
+        Gets payouts breakdown in currency.
+
+        <div class='note'><b>Note</b><br><br>This API method can't be used under high load. When the number of requests is high, rate limits may apply. Contact your Account Manager to find out the rate limits for this API method.</div>
+      tags:
+        - Reports
+      operationId: get-payouts
+      security:
+        - basicAuth: []
+      parameters:
+        - $ref: '#/components/parameters/merchant-id-path-param'
+        - $ref: '#/components/parameters/datetime-from'
+        - $ref: '#/components/parameters/datetime-to'
+        - $ref: '#/components/parameters/legal-entity-id'
+        - $ref: '#/components/parameters/transaction-status'
+      responses:
+        '200':
+          description: OK.
+          content:
+            application/json:
+              example:
+                - IsoCurrency: RUB
+                  PaymentsAmount: 223679.84
+                  SumCommissionAgent: 11329.58
+                  SumCommissionUserTaxes: 153.67
+                  SumItems: 571325.13
+                  SumNominalSum: 214792.98
+                  SumOutProject: 551096.13
+                  SumPayoutSum: 193316.71
+                  TaxesOfPayments: 171.56
+                  DirectTaxesOfPayments: 0.46
+                - IsoCurrency: USD
+                  PaymentsAmount: 482.58
+                  SumCommissionAgent: 77.51
+                  SumCommissionUserTaxes: 0.07
+                  SumItems: 243777.62
+                  SumNominalSum: 493.09
+                  SumOutProject: 241787.62
+                  SumPayoutSum: 462.62
+                  TaxesOfPayments: 0.14
+                  DirectTaxesOfPayments: 0.14
+                - IsoCurrency: EUR
+                  PaymentsAmount: 608.2
+                  SumCommissionAgent: 55.71
+                  SumCommissionUserTaxes: 90.94
+                  SumItems: 156238.62
+                  SumNominalSum: 607.26
+                  SumOutProject: 156158.62
+                  SumPayoutSum: 460.8
+                  TaxesOfPayments: 90.94
+                  DirectTaxesOfPayments: 0.07
+  '/merchants/{merchant_id}/reports':
+    get:
+      summary: Get reports
+      description: Gets the list of financial reports over a specified period.
+      tags:
+        - Reports
+      operationId: get-reports
+      security:
+        - basicAuth: []
+      parameters:
+        - $ref: '#/components/parameters/merchant-id-path-param'
+        - $ref: '#/components/parameters/datetime-from-req'
+        - $ref: '#/components/parameters/datetime-to-req'
+      responses:
+        '200':
+          description: OK.
+          content:
+            application/json:
+              example:
+                - agreement_document_id: Organization Inc_RUB
+                  currency: RUB
+                  is_direct_payout: false
+                  is_draft_by_agreement: true
+                  month: January
+                  report_id: 57613
+                  year: 2019
+                - agreement_document_id: Organization Inc_EUR
+                  currency: USD
+                  is_direct_payout: false
+                  is_draft_by_agreement: true
+                  month: January
+                  report_id: 57619
+                  year: 2019
+  '/merchants/{merchant_id}/reports/transactions/{transaction_id}/refund':
+    put:
+      summary: Request refund
+      description: |
+        Sends a refund request to return a payment to a user. Read about [the Refund feature](https://developers.xsolla.com/doc/pay-station/features/refund/) to learn more about the process.
+
+        <div class='note'><b>Note</b><br><br>This API method can't be used under high load. When the number of requests is high, rate limits may apply. Contact your Account Manager to find out the rate limits for this API method.</div>
+      tags:
+        - Refund
+      operationId: request-refund
+      security:
+        - basicAuth: []
+      parameters:
+        - $ref: '#/components/parameters/merchant-id-path-param'
+        - $ref: '#/components/parameters/transaction-id-path-param'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - description
+              properties:
+                description:
+                  type: string
+                  description: Reason for a refund.
+                email:
+                  type: string
+                  description: User email.
+            example:
+              description: test refund request
+      responses:
+        '200':
+          description: OK (No error).
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    description: |
+                      Can return one of two messages:
+                      - The request for a refund has been accepted. Xsolla CS will manually complete the refund. It may take up to two business days.
+                      - The request for a refund has been accepted. Xsolla CS will automatically send the customer an email with alternative refund options as the user's method does not support direct refunds.
+              example:
+                message: "The request for a refund has been accepted. Xsolla CS will automatically send the customer an email with alternative refund options as the user's method does not support direct refunds."
+        '204':
+          description: No Content (No error).
+        '401':
+          description: Unauthorized (Access denied).
+        '404':
+          description: Transaction Not Found.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    description: Transaction ID not valid. Please check payment credentials. Otherwise, contact Xsolla support at support@xsolla.com.
+              example:
+                message: "Transaction ID not valid. Please check payment credentials. Otherwise, contact Xsolla support at support@xsolla.com."
+        '422':
+          description: Unprocessable Entity (Invalid request parameters).
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    description: |
+                      Can return one of the following messages:
+                      - We are processing the refund request. This may take up to two business days.
+                      - We are reaching the user for the information required for the refund. For details, contact Xsolla Support.
+                      - Incorrect payment status. Refund is possible only for payments with "completed" or "error" status.
+                      - To process this request, the customer's email address field must be filled. Please specify the customer's email address and try again.
+                      - Full refund is unavailable because there are successful partial refunds for this transaction.
+                      - Refund failed. Please contact Xsolla Support to process it manually.
+              example:
+                message: "We are processing the refund request. This may take up to two business days."
+  '/merchants/{merchant_id}/reports/transactions/{transaction_id}/partial_refund':
+    put:
+      summary: Request partial refund
+      description: |
+        Sends a partial refund request to return a part of a payment to a user. Please note that a partial refund is available only for credit card and PayPal payments. Read about [the Refund feature](https://developers.xsolla.com/doc/pay-station/features/refund/) to learn more about the process.
+      tags:
+        - Refund
+      operationId: request-partial-refund
+      security:
+        - basicAuth: []
+      parameters:
+        - $ref: '#/components/parameters/merchant-id-path-param'
+        - $ref: '#/components/parameters/transaction-id-path-param'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - description
+                - refund_amount
+              properties:
+                description:
+                  type: string
+                  description: Reason for a refund.
+                refund_amount:
+                  type: integer
+                  format: float
+                  description: The refund amount in a purchase currency.
+            example:
+              refund_amount: '1.50'
+              description: test refund request
+      responses:
+        '200':
+          description: OK (No error).
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    description: |
+                      Can return one of two messages:
+                      - The request for a refund has been accepted. Xsolla CS will manually complete the refund. It may take up to two business days.
+                      - The request for a refund has been accepted. Xsolla CS will automatically send the customer an email with alternative refund options as the user's method does not support direct refunds.
+              example:
+                message: "The request for a refund has been accepted. Xsolla CS will automatically send the customer an email with alternative refund options as the user's method does not support direct refunds."
+        '204':
+          description: No Content (No error).
+        '401':
+          description: Unauthorized (Access denied).
+        '404':
+          description: Transaction Not Found.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    description: Transaction ID not valid. Please check payment credentials. Otherwise, contact Xsolla support at support@xsolla.com.
+              example:
+                message: "Transaction ID not valid. Please check payment credentials. Otherwise, contact Xsolla support at support@xsolla.com."
+        '422':
+          description: Unprocessable Entity (Invalid request parameters).
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    description: |
+                      Can return one of the following messages:
+                      - We are processing the refund request. This may take up to two business days.
+                      - We are reaching the user for the information required for the refund. For details, contact Xsolla Support.
+                      - Incorrect payment status. Refund is possible only for payments with "completed" or "error" status.
+                      - To process this request, the customer's email address field must be filled. Please specify the customer's email address and try again.
+                      - Full refund is unavailable because there are successful partial refunds for this transaction.
+                      - Refund failed. Please contact Xsolla Support to process it manually.
+              example:
+                message: "We are processing the refund request. This may take up to two business days."
+components:
+  parameters:
+    format:
+      name: format
+      in: path
+      required: true
+      description: |
+        Data format. Possible values:
+        - json
+        - csv
+        - xsl
+      schema:
+        type: string
+        enum:
+          - json
+          - csv
+          - xls
+    transaction-id-path-param:
+      name: transaction_id
+      in: path
+      required: true
+      description: Transaction ID.
+      schema:
+        type: integer
+    project-id-path-param:
+      name: project_id
+      in: path
+      required: true
+      description: Project ID.
+      schema:
+        type: integer
+    user-id-path-param:
+      name: user_id
+      in: path
+      required: true
+      description: User ID.
+      schema:
+        type: string
+    account-id-path-param:
+      name: account_id
+      in: path
+      required: true
+      description: ID of the saved account in Xsolla database.
+      schema:
+        type: integer
+    type-path-param:
+      name: type
+      in: path
+      required: true
+      description: |
+        Type of payment account. Possible values:
+        - `card` — bank cards,
+        - `amazon` — Amazon Pay,
+        - `skrill` — Skrill Digital Wallet,
+        - `yandex` — Yandex.Money,
+        - `paymasterwebmoney` — WebMoney,
+        - `paypal` — PayPal,
+        - `qiwi` — QIWI Wallet,
+        - `toss` - Toss Wallet.
+
+        If you receive an HTTP 422 error status code, the request returns an error code with its detailed description.
+      schema:
+        type: string
+        enum:
+          - card
+          - amazon
+          - skrill
+          - yandex
+          - paymasterwebmoney
+          - paypal
+          - qiwi
+          - toss
+    merchant-id-path-param:
+      name: merchant_id
+      in: path
+      required: true
+      description: Merchant ID.
+      schema:
+        type: integer
+    datetime-from-req:
+      name: datetime_from
+      in: query
+      required: true
+      description: Period start.
+      schema:
+        type: string
+        format: datetime
+    datetime-to-req:
+      name: datetime_to
+      in: query
+      required: true
+      description: Period end.
+      schema:
+        type: string
+        format: datetime
+    datetime-from:
+      name: datetime_from
+      in: query
+      required: false
+      description: Period start.
+      schema:
+        type: string
+        format: datetime
+    datetime-to:
+      name: datetime_to
+      in: query
+      required: false
+      description: Period end.
+      schema:
+        type: string
+        format: datetime
+    project-id-query-param:
+      name: project_id
+      in: query
+      required: false
+      description: Project ID.
+      schema:
+        type: integer
+    show-dry-run:
+      name: show_dry_run
+      in: query
+      required: false
+      description: Whether to include test transactions.
+      schema:
+        type: boolean
+    transaction-id:
+      name: transaction_id
+      in: query
+      required: false
+      description: Transaction ID.
+      schema:
+        type: integer
+    phone:
+      name: phone
+      in: query
+      required: false
+      description: Phone number in international format.
+      schema:
+        type: string
+    user-id-query-param:
+      name: user_id
+      in: query
+      required: false
+      description: User ID.
+      schema:
+        type: string
+    user-name:
+      name: user_name
+      in: query
+      required: false
+      description: Username.
+      schema:
+        type: string
+    user-custom:
+      name: user_custom
+      in: query
+      required: false
+      description: Custom parameter for user identification.
+      schema:
+        type: string
+    email:
+      name: email
+      in: query
+      required: false
+      description: User email.
+      schema:
+        type: string
+    external-id:
+      name: external_id
+      in: query
+      required: false
+      description: Transaction external ID.
+      schema:
+        type: string
+    offset:
+      name: offset
+      in: query
+      required: false
+      description: Number of the element from which the list is generated (the count starts from 0).
+      schema:
+        type: integer
+    limit:
+      name: limit
+      in: query
+      required: false
+      description: Limit for the number of elements on the page.
+      schema:
+        type: integer
+    transaction-type:
+      name: transaction_type
+      in: query
+      required: false
+      description: Type of transaction. Can be `payment`, `coupon`, `inGamePurchase`, `internal`, or `cancellation`.
+      schema:
+        type: string
+        enum:
+          - payment
+          - coupon
+          - inGamePurchase
+          - internal
+          - cancellation
+    status:
+      name: status
+      in: query
+      required: false
+      description: Additional transaction status. Can be `created`, `processing`, `done`, `canceled`, `error`, `review`, `refunded`, `awaitingRefund`.
+      schema:
+        type: string
+        enum:
+          - created
+          - processing
+          - done
+          - canceled
+          - error
+          - review
+          - refunded
+          - awaitingRefund
+    report-id:
+      name: report_id
+      in: query
+      required: false
+      description: Financial report ID.
+      schema:
+        type: integer
+    transfer-id:
+      name: transfer_id
+      in: query
+      required: false
+      description: Payout ID.
+      schema:
+        type: integer
+    in-transfer-currency:
+      name: in_transfer_currency
+      in: query
+      required: true
+      description: Converts all financial data to the payout currency (the pay-in currency is used by default).
+      schema:
+        type: integer
+    show-total:
+      name: show_total
+      in: query
+      required: true
+      description: Adds totals to the report.
+      schema:
+        type: boolean
+    transaction-status:
+      name: status
+      in: query
+      required: false
+      description: Transaction status. Can be `done`, `canceled`, or `error`.
+      schema:
+        type: string
+        enum:
+          - done
+          - canceled
+          - error
+    merchant-of-records:
+      name: merchant_of_records
+      in: query
+      required: false
+      description: Merchant of Record. Can be `xsolla`, `merchant`, or not specified. If `merchant`, returns transactions made via the partner’s gateways. If `xsolla`, returns transactions made not via the partner’s gateways. If not specified, returns all transactions.
+      schema:
+        type: string
+        enum:
+          - xsolla
+          - merchant
+    legal-entity-id:
+      name: legal_entity_id
+      in: query
+      required: false
+      description: ID of the developer's legal entity.
+      schema:
+        type: integer
+  schemas:
+    User:
+      type: object
+      description: User details.
+      required:
+        - id
+      properties:
+        id:
+          type: object
+          required:
+            - value
+          properties:
+            value:
+              type: string
+              description: User ID.
+        email:
+          type: object
+          description: |
+            The `user.email` object is an integral part of building anti-fraud models and helps increase acceptance rates. It is both Xsolla and payment systems requirement. If the parameter is not passed, the required field for entering email appears on the payment page. A user receives a purchase receipt to the email passed in the parameter or entered on the payment page.
+          required:
+            - value
+          properties:
+            value:
+              type: string
+              description: User email. Must be valid according to the [RFC 822](https://www.w3.org/Protocols/rfc822/#z8) protocol.
+        name:
+          type: object
+          properties:
+            value:
+              type: string
+              description: User screen name.
+        age:
+          type: integer
+          description: User age.
+        phone:
+          type: object
+          properties:
+            value:
+              type: string
+              description: User phone number.
+        country:
+          type: object
+          properties:
+            value:
+              type: string
+              description: Two-letter uppercase country code per [ISO 3166-1 alpha-2](https://en.wikipedia.org/wiki/ISO_3166-1_alpha-2).
+            allow_modify:
+              type: boolean
+              description: Whether or not user can change the country on payment UI. `false` by default.
+        attributes:
+          type: object
+          description: User attributes for filtering the item list, represented as a valid JSON set of key-value pairs.
+        steam_id:
+          type: object
+          properties:
+            value:
+              type: string
+              description: Steam ID.
+        tracking_id:
+          type: object
+          properties:
+            value:
+              type: string
+              description: Unique tracking ID (used in marketing campaigns).
+        public_id:
+          type: object
+          properties:
+            value:
+              type: string
+              description: Parameter that uniquely identifies the user and is known to the user (email, screen name, etc). Allows the user to make purchases outside the game store (e.g., via cash kiosks).
+        utm:
+          type: object
+          description: Traffic attributes.
+          properties:
+            utm_source:
+              type: string
+              description: Traffic source.
+            utm_medium:
+              type: string
+              description: Traffic channel (contextual ads, media ads, email lists, etc.).
+            utm_campaign:
+              type: string
+              description: Campaign title, transliterated or translated to English.
+            utm_term:
+              type: string
+              description: Campaign keyword. If set, statistics will be based on the keywords used for ad targeting rather than on specific search queries. In Google Analytics, the specified `utm_term` is part of the general search terms report.
+            utm_content:
+              type: string
+              description: Campaign content.
+        is_legal:
+          type: boolean
+          description: Whether the user is a legal entity.
+        legal:
+          type: object
+          description: Object with legal entity details. Object and all its parameters are required if `user.is_legal` is `true`.
+          properties:
+            name:
+              type: string
+              description: Full legal name.
+            address:
+              type: string
+              description: Full legal address.
+            vat_id:
+              type: string
+              description: Individual taxpayer identifier.
+            country:
+              type: string
+              description: Country of incorporation. Two-letter uppercase country code per [ISO 3166-1 alpha-2](https://en.wikipedia.org/wiki/ISO_3166-1_alpha-2) is used.
+    Settings:
+      type: object
+      description: Custom project settings.
+      required:
+        - project_id
+      properties:
+        project_id:
+          type: integer
+          description: Game’s Xsolla ID. Can be found in Publisher Account.
+        external_id:
+          type: string
+          description: Transaction’s external ID.
+        language:
+          type: string
+          description: Interface language. Two-letter lowercase [language code](https://developers.xsolla.com/doc/pay-station/features/localization/).
+        return_url:
+          type: string
+          description: Page to redirect the user to after payment. Parameters `user_id`, `foreigninvoice`, `invoice_id` and `status` will be automatically added to the link.
+        redirect_policy:
+          type: object
+          description: Redirect policy settings.
+          properties:
+            redirect_conditions:
+              type: string
+              description: Payment status for which a user is redirected to the return URL. Can be `none`, `successful`, `successful_or_canсeled`, or `any`.
+              enum:
+                - none
+                - successful
+                - successful_or_canceled
+                - any
+            delay:
+              type: integer
+              description: Delay (in seconds) after which a user is automatically redirected to the return URL.
+            status_for_manual_redirection:
+              type: string
+              description: Payment status for which a button redirecting a user to the return URL is displayed. Can be `none`, `successful`, `successful_or_canсeled`, or `any`.
+              enum:
+                - none
+                - successful
+                - successful_or_canceled
+                - any
+            manual_redirection_action:
+              type: string
+              description: Pay Station behavior triggered by the user clicking the close button or the **Back to the Game** button. Can be `redirect` (by default) and `postmessage`. If set to `redirect`, a user is redirected to the URL passed in the token or specified in Publisher Account. If set to `postmessage`, a user is not redirected to other pages. Clicking the close icon initiates sending the `close` event, and clicking the **Back to the Game** button — the `return` event.
+              enum:
+                - redirect
+                - postmessage
+            redirect_button_caption:
+              type: string
+              description: Text on the button for manual redirection.
+        currency:
+          type: string
+          description: Preferred payment currency. Three-letter currency code per [ISO 4217](https://en.wikipedia.org/wiki/ISO_4217).
+        mode:
+          type: string
+          description: Set to `sandbox` to test out the payment process. In this case, use *https://sandbox-secure.xsolla.com* to access the test payment UI.
+        payment_method:
+          type: integer
+          description: Payment method ID.
+        payment_widget:
+          type: string
+          description: Payment widget. Can be `paybycash` or `giftcard`. If the parameter is set, the user is redirected to the Pay by Cash or Gift Cards widget, respectively.
+          enum:
+            - paybycash
+            - giftcard
+        ui:
+          type: object
+          description: Interface settings.
+          properties:
+            theme:
+              type: string
+              description: Payment UI theme. Can be `default` or `default_dark`.
+              enum:
+                - default
+                - default_dark
+            size:
+              type: string
+              description: |
+                Payment UI size. Can be:
+                  - [small](https://livedemo.xsolla.com/developers/small/): the least possible size of the payment UI. Use this value when the window size is strictly limited (dimensions: 620 x 630)
+                  - [medium](https://livedemo.xsolla.com/developers/medium/): recommended size. Use this value to display the payment UI in a lightbox (dimensions: 740 x 760)
+                  - [large](https://livedemo.xsolla.com/developers/large/): the optimal size for displaying the payment UI in a new window or tab (dimensions: 820 x 840)
+              enum:
+                - small
+                - medium
+                - large
+            version:
+              type: string
+              description: Device type. Can be `desktop` (default) or `mobile`.
+              enum:
+                - desktop
+                - mobile
+            desktop:
+              type: object
+              description: Interface settings for the desktop version.
+              properties:
+                header:
+                  type: object
+                  description: Header settings.
+                  properties:
+                    is_visible:
+                      type: boolean
+                      description: Whether to show the header in the payment UI.
+                    visible_logo:
+                      type: boolean
+                      description: If `true`, the header will show your logo (first provide the image to your account manager).
+                    visible_name:
+                      type: boolean
+                      description: Whether to show the project name in the header.
+                    visible_purchase:
+                      type: boolean
+                      description: Whether to show the purchase description (`purchase.description.value`) in the header. `true` by default.
+                    type:
+                      type: string
+                      description: How to show the header. Can be `compact` (hides project name and user ID) or `normal` (default).
+                      enum:
+                        - compact
+                        - normal
+                    close_button:
+                      type: boolean
+                      description: Whether to show a Close button in Pay Station desktop. The button closes Pay Station and redirects the user to the URL specified in the `settings.return_url` parameter. `false` by default.
+                subscription_list:
+                  type: object
+                  description: Settings for the list of subscription plans.
+                  properties:
+                    layout:
+                      type: string
+                      description: List template. Can be `list` (default) or `grid`.
+                      enum:
+                        - list
+                        - grid
+                    description:
+                      type: string
+                      description: Any text to show above the list of available subscription plans in the payment UI.
+                    display_local_price:
+                      type: boolean
+                      description: |
+                        If `true`, and if the user’s local currency is different from the one set for the subscription plan, the user will be able to see both prices: one in the local and one in the basic currency.
+                virtual_item_list:
+                  type: object
+                  description: Settings for the list of virtual items.
+                  properties:
+                    layout:
+                      type: string
+                      description: List template. Can be `list` (default) or `grid`.
+                      enum:
+                        - list
+                        - grid
+                    button_with_price:
+                      type: boolean
+                      description: If `true`, the price will be shown on the button. If `false`, the price will be shown on the left of the button. `false` by default.
+                    view:
+                      type: string
+                      description: Display virtual item groups as a vertical/horizontal menu. Can be `horizontal_navigation` or `vertical_navigation` (default).
+                      enum:
+                        - horizontal_navigation
+                        - vertical_navigation
+                virtual_currency_list:
+                  type: object
+                  description: Settings for the list of virtual currencies.
+                  properties:
+                    description:
+                      type: string
+                      description: Any text to show above the list of virtual currencies.
+                    button_with_price:
+                      type: boolean
+                      description: If `true`, the price will be shown on the button. If `false`, the price will be shown on the left of the button. `false` by default.
+            header:
+              type: object
+              properties:
+                visible_virtual_currency_balance:
+                  type: boolean
+                  description: Whether or not this element can be hidden on Payment UI. `true` by default.
+            mobile:
+              type: object
+              properties:
+                mode:
+                  type: string
+                  description: A user can only pay using their saved payment methods. Can be `saved_accounts`.
+                  enum:
+                    - saved_accounts
+                header:
+                  type: object
+                  properties:
+                    close_button:
+                      type: boolean
+                      description: Whether to show a Close button in Pay Station mobile. The button closes Pay Station and redirects the user to the URL specified in the `settings.return_url` parameter. `false` by default.
+                footer:
+                  type: object
+                  properties:
+                    is_visible:
+                      type: boolean
+                      description: Whether to hide the footer in the mobile version of the payment UI.
+            license_url:
+              type: string
+              description: Link to the EULA.
+            components:
+              type: object
+              description: Menu settings.
+              properties:
+                virtual_items:
+                  type: object
+                  description: Virtual items submenu settings.
+                  properties:
+                    order:
+                      type: integer
+                      description: Position of the submenu in the menu.
+                    hidden:
+                      type: boolean
+                      description: Whether to show the submenu.
+                    selected_group:
+                      type: string
+                      description: Group to show after opening the virtual items tab.
+                    selected_item:
+                      type: string
+                      description: Item to show after opening the virtual items tab (item SKU).
+                virtual_currency:
+                  type: object
+                  description: Virtual currency submenu settings.
+                  properties:
+                    custom_amount:
+                      type: boolean
+                      description: Whether the user can enter an arbitrary quantity of the virtual currency in the payment UI.
+                    order:
+                      type: integer
+                      description: Position of the submenu in the menu.
+                    hidden:
+                      type: boolean
+                      description: Whether to show the submenu.
+                subscriptions:
+                  type: object
+                  description: Subscription plans submenu settings.
+                  properties:
+                    order:
+                      type: integer
+                      description: Position of the submenu in the menu.
+                    hidden:
+                      type: boolean
+                      description: Whether to show the submenu.
+            mode:
+              type: string
+              description: |
+                Interface mode in Pay Station. Can be `user_account` only. The header contains only the account navigation menu, and the user cannot select a product or make a payment.
+            is_prevent_external_link_open:
+              type: boolean
+              description: Whether or not redirecting links to an external resource is disabled. `true` by default. When clicking an external link, the `external-link-open` event is sent via the `postMessage` mechanism. The address for the redirected link is passed in the `url` parameter.
+            user_account:
+              type: object
+              description: User account details.
+              properties:
+                info:
+                  type: object
+                  description: Page **My account**.
+                  properties:
+                    order:
+                      type: integer
+                      description: Position of the submenu in the menu.
+                    enable:
+                      type: boolean
+                      description: Whether to show the submenu. `false` by default.
+                history:
+                  type: object
+                  description: "**History** submenu."
+                  properties:
+                    order:
+                      type: integer
+                      description: Position of the submenu in the menu.
+                    enable:
+                      type: boolean
+                      description: Whether to show the submenu. `false` by default.
+                payment_accounts:
+                  type: object
+                  description: "**My payment accounts** submenu."
+                  properties:
+                    order:
+                      type: integer
+                      description: Position of the submenu in the menu.
+                    enable:
+                      type: boolean
+                      description: Whether to show the submenu. `false` by default.
+                subscriptions:
+                  type: object
+                  description: "**Manage subscriptions** submenu."
+                  properties:
+                    order:
+                      type: integer
+                      description: Position of the submenu in the menu.
+                    enable:
+                      type: boolean
+                      description: Whether to show the submenu. `false` by default.
+    Purchase:
+      type: object
+      description: Object containing purchase details.
+      properties:
+        virtual_currency:
+          type: object
+          description: Object containing virtual currency details.
+          properties:
+            quantity:
+              type: integer
+              format: float
+              description: Purchase amount in the virtual currency.
+            currency:
+              type: string
+              description: Currency of the virtual currency package to use in all calculations.
+        virtual_items:
+          type: object
+          description: Object with data about the virtual items in purchase.
+          properties:
+            currency:
+              type: string
+              description: Currency of the ordered items to use in all calculations.
+            items:
+              type: array
+              items:
+                type: object
+                description: Item data.
+                properties:
+                  sku:
+                    type: string
+                    description: Item ID.
+                  amount:
+                    type: integer
+                    description: Item quantity.
+                  available_groups:
+                    type: array
+                    items:
+                      type: string
+                    description: Item groups IDs (array). The payment UI will only include items within the specified group.
+        subscription:
+          type: object
+          description: Subscription data.
+          properties:
+            plan_id:
+              type: string
+              description: Plan ID.
+            operation:
+              type: string
+              description: The type of operation applied to the user’s subscription plan. To change the subscription plan, pass the `change_plan` value. You need to specify the new plan ID in the `purchase.subscription.plan_id` parameter.
+            product_id:
+              type: string
+              description: Product ID.
+            currency:
+              type: string
+              description: Currency of the subscription plan to use in all calculations.
+            available_plans:
+              type: array
+              items:
+                type: string
+              description: Subscription plans to show in the payment UI.
+            trial_days:
+              type: integer
+              description: Trial period in days.
+        pin_codes:
+          type: object
+          description: Game keys.
+          properties:
+            currency:
+              type: string
+              description: Currency of a Game key within the order to use in all calculations.
+            codes:
+              type: array
+              description: Game keys.
+              items:
+                type: object
+                properties:
+                  digital_content:
+                    type: string
+                    description: Game SKU set in Publisher Account.
+                  drm:
+                    type: string
+                    description: DRM platform used to distribute the game. Can be `steam`, `playstation`, `xbox`, `uplay`, `origin`, `drmfree`, `gog`, `epicgames`, `nintendo_eshop`, `discord_game_store`, or `oculus`. Make sure to have configured the required DRM platforms in your Publisher Account. If not passed in the token, will be chosen by the user in the payment UI.
+                    enum:
+                      - steam
+                      - playstation
+                      - xbox
+                      - uplay
+                      - origin
+                      - drmfree
+                      - gog
+                      - epicgames
+                      - nintendo_eshop
+                      - discord_game_store
+                      - oculus
+            upgrade:
+              type: object
+              description: Object with the upgrade data.
+              properties:
+                id_user_history:
+                  type: integer
+                  description: ID of the entry containing data on the user and their packages.
+                id:
+                  type: integer
+                  description: Upgrade ID.
+        gift:
+          type: object
+          description: Gift details.
+          properties:
+            giver_id:
+              type: string
+              description: Giver ID.
+            message:
+              type: string
+              description: Message from the giver.
+            hide_giver_from_receiver:
+              type: string
+              description: Whether to hide the giver identity from the recipient. `true` by default.
+            friends:
+              type: array
+              description: Array with data on friends.
+              items:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    description: Gift recipient ID.
+                  name:
+                    type: string
+                    description: Gift recipient nickname.
+                  email:
+                    type: string
+                    description: Gift recipient email.
+        coupon_code:
+          type: object
+          description: Information about a discount promo code or bonuses upon purchase.
+          properties:
+            value:
+              type: string
+              description: Promo code value.
+            hidden:
+              type: boolean
+              description: Hide the field promo code is entered into in the payment UI. `false` by default.
+    CustomParameters:
+      type: object
+      description: |
+        You can pass additional parameters in the token in the `custom_parameters` object to configure anti-fraud filters. The recommended parameters are shown in the drop-down list. [See Pay Station documentation](https://developers.xsolla.com/doc/pay-station/features/antifraud/).
+      properties:
+        registration_date:
+          type: string
+          description: Account creation date per [ISO 8601](https://en.wikipedia.org/wiki/ISO_8601).
+        total_hours:
+          type: integer
+          description: Total number of in-game hours.
+        total_characters:
+          type: integer
+          description: Number of in-game characters.
+        social_networks_added:
+          type: boolean
+          description: Whether the player has connected social media profiles.
+        profile_image_added:
+          type: boolean
+          description: Whether the player has uploaded a profile image.
+        active_date:
+          type: string
+          description: Last seen date per [ISO 8601](https://en.wikipedia.org/wiki/ISO_8601).
+        total_friends:
+          type: integer
+          description: Number of friends.
+        additional_verification:
+          type: boolean
+          description: Whether the player uses account verification procedures.
+        win_rate:
+          type: integer
+          description: Win rate.
+        last_change_password_date:
+          type: string
+          description: Last password change date per [ISO 8601](https://en.wikipedia.org/wiki/ISO_8601).
+        chat_activity:
+          type: boolean
+          description: Whether the player uses the chat function.
+        forum_activity:
+          type: boolean
+          description: Whether the player uses the forum function.
+        total_bans:
+          type: integer
+          description: Number of times the player was banned in the chat/forum.
+        profile_completed:
+          type: boolean
+          description: Whether the player added additional information to their profile.
+        notifications_enabled:
+          type: boolean
+          description: Whether the player enabled notifications.
+        user_level:
+          type: integer
+          description: Player’s level, reputation, or rank.
+        karma_points:
+          type: integer
+          description: Player’s karma.
+        total_sum:
+          type: integer
+          format: float
+          description: Total amount of payments.
+        non_premium_currency:
+          type: integer
+          format: float
+          description: Amount of non-premium currency.
+        total_game_events:
+          type: integer
+          description: Number of in-game events the player took part in.
+        total_gifts:
+          type: integer
+          description: Number of in-game gifts the player has sent/received.
+        tutorial_completed:
+          type: boolean
+          description: Whether the player has completed the game’s tutorial.
+        completed_tasks:
+          type: integer
+          description: Number of tasks/objectives completed.
+        items_used:
+          type: boolean
+          description: Whether the player uses purchased in-game items.
+        pvp_activity:
+          type: boolean
+          description: Whether the player takes part in PvP battles.
+        total_clans:
+          type: integer
+          description: Number of clans the player is a member of.
+        unlocked_achievements:
+          type: integer
+          description: Number of achievements unlocked.
+        total_inventory_value:
+          type: integer
+          format: float
+          description: Total inventory value (in-game currency).
+        character_customized:
+          type: boolean
+          description: Whether the player has customized their character.
+        session_time:
+          type: string
+          description: Average session time per [ISO 8601](https://en.wikipedia.org/wiki/ISO_8601).
+    User_body:
+      type: object
+      description: User details.
+      required:
+        - ip
+      properties:
+        ip:
+          type: string
+          description: User IP address.
+        name:
+          type: string
+          description: Username.
+        legal:
+          type: object
+          description: Object with legal entity details.
+          properties:
+            legal:
+              type: string
+              description: Full legal name.
+            address:
+              type: string
+              description: Full legal address.
+            vat_id:
+              type: string
+              description: Individual taxpayer identifier.
+            country:
+              type: string
+              description: Country of incorporation. Two-letter uppercase country code per [ISO 3166-1 alpha-2](https://en.wikipedia.org/wiki/ISO_3166-1_alpha-2) is used.
+    Purchase_body:
+      type: object
+      description: Object containing purchase details.
+      properties:
+        virtual_currency:
+          type: object
+          description: Object containing virtual currency details.
+          properties:
+            quantity:
+              type: integer
+              format: float
+              description: Purchase amount in the virtual currency.
+        checkout:
+          type: object
+          description: Object containing checkout details.
+          properties:
+            currency:
+              type: string
+              description: Currency of the purchase. Three-letter currency code per [ISO 4217](https://en.wikipedia.org/wiki/ISO_4217).
+            amount:
+              type: integer
+              format: float
+              description: Purchase amount.
+    Settings_body:
+      type: object
+      description: Object containing purchase settings.
+      properties:
+        mode:
+          type: string
+          description: Set to `sandbox` to test out the payment process. Remove the parameter for real payments.
+  securitySchemes:
+    basicAuth:
+      type: http
+      description: |-
+        Xsolla API uses basic access authentication. All requests to API must contain the `Authorization: Basic <your_authorization_basic_key>` header, where `your_authorization_basic_key` is the `merchant_id:api_key` pair encoded according to the Base64 standard.
+
+         Go to **[Xsolla Publisher Account](https://publisher.xsolla.com/) > Company settings** to find <ul><li> `merchant_id` on the Company tab</li><li> `api_key` on the API key tab.</li></ul><br>
+      scheme: basic
